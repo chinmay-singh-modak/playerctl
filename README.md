@@ -1,69 +1,11 @@
-# Playerctl for Flutter (Linux)
+# playerctl
 
-A Flutter plugin for Linux that provides robust media playback control using the `playerctl` command-line tool. Built with SOLID principles, Pure Dart (no FFI), and state-management-agnostic architecture.
-
-## Features
-
-✅ **Real-time Media Information**
-
-- Song title, artist, album
-- Album artwork with local HTTP server (cross-device access)
-- Playback status (Playing, Paused, Stopped)
-- Player name detection (Spotify, VLC, Brave, etc.)
-- Track position and length
-- Shuffle and loop status
-
-✅ **Playback Controls**
-
-- Play/Pause/Stop
-- Next/Previous track
-- Volume control (0-100)
-- Shuffle toggle
-- Loop cycling (None → Track → Playlist)
-- Seek/scrub functionality (position control in microseconds)
-- Forward/backward skip by seconds
-
-✅ **Multi-Player Support**
-
-- Detect all active MPRIS-compatible players
-- Switch between different media players
-- Automatic player switching when current player closes
-- Real-time synchronization across multiple players
-
-✅ **Robust Error Handling**
-
-- Automatic process restart (up to 5 attempts)
-- Handles playerctl crashes gracefully
-- Checks if playerctl is installed
-- Handles no active players gracefully
-- Special character support in metadata (pipe characters, etc.)
-
-✅ **State-Agnostic Architecture**
-
-- Use with any state management solution (GetX, Riverpod, Bloc, Provider, etc.)
-- Clean SOLID architecture
-- Service-oriented design with dependency injection
-- Optional GetX wrapper included
-
-✅ **Advanced Synchronization**
-
-- Triple-layer sync (real-time stream + periodic metadata refresh + volume sync)
-- External volume changes detected automatically
-- Debounced player switching to prevent glitches
-
-✅ **Configurable Logging**
-
-- Level-wise logging (none, error, warning, info, debug)
-- Emoji-based categorization (🔍 DEBUG, ℹ️ INFO, ⚠️ WARNING, ❌ ERROR, etc.)
-- Production-ready with silent mode
-- Customizable log levels at runtime
+Flutter plugin for Linux — wraps the `playerctl` CLI to give your app real-time media control over any MPRIS-compatible player. Pure Dart, no FFI.
 
 ## Requirements
 
-- **Platform**: Linux only
-- **playerctl**: Must be installed on the system
-
-### Installing playerctl
+- Linux only
+- `playerctl` installed on the system
 
 ```bash
 # Debian/Ubuntu
@@ -81,16 +23,12 @@ sudo zypper install playerctl
 
 ## Installation
 
-Add this to your package's `pubspec.yaml` file:
-
 ```yaml
 dependencies:
-  playerctl:
-    git:
-      url: https://github.com/yourusername/playerctl.git
+  playerctl: ^1.2.0
 ```
 
-Or if you're developing locally:
+Or from source:
 
 ```yaml
 dependencies:
@@ -100,28 +38,19 @@ dependencies:
 
 ## Usage
 
-### Option 1: Using the Core Manager (State-Agnostic)
-
 ```dart
 import 'package:playerctl/playerctl.dart';
 
-// Create the manager
 final manager = MediaPlayerManager();
 
-// Listen to state changes
 manager.stateStream.listen((state) {
-  print('Title: ${state.currentMedia.title}');
-  print('Artist: ${state.currentMedia.artist}');
+  print('${state.currentMedia.title} — ${state.currentMedia.artist}');
   print('Status: ${state.playbackStatus}');
   print('Volume: ${state.volume}');
-  print('Shuffle: ${state.shuffleStatus}');
-  print('Loop: ${state.loopStatus}');
 });
 
-// Initialize
 await manager.initialize();
 
-// Control playback
 await manager.play();
 await manager.pause();
 await manager.next();
@@ -129,439 +58,155 @@ await manager.previous();
 await manager.setVolume(75);
 await manager.toggleShuffle();
 await manager.cycleLoop();
-
-// Switch players
 await manager.switchPlayer('spotify');
 
-// Cleanup
 manager.dispose();
 ```
 
-### Option 2: Using GetX Wrapper
+### Seeking
+
+Position values follow the MPRIS standard — microseconds.
 
 ```dart
-import 'package:playerctl/playerctl.dart';
-import 'package:get/get.dart';
+final position = await manager.getPosition();
 
-// Initialize the controller
-final MediaController controller = Get.put(MediaController());
+await manager.seekTo(30000000);   // jump to 30s
+await manager.seek(10000000);     // forward 10s
+await manager.seek(-10000000);    // backward 10s
+await manager.seekForward(10);    // forward 10s (seconds shorthand)
+await manager.seekBackward(5);    // backward 5s
 
-// The controller automatically:
-// - Checks if playerctl is installed
-// - Detects active media players
-// - Starts listening to metadata changes
-// - Handles player disconnections/reconnections
-// - Syncs volume and metadata periodically
-
-### Accessing Media Information (GetX)
-
-```dart
-Obx(() {
-  final media = controller.currentMedia.value;
-  return Column(
-    children: [
-      Text('Title: ${media.title}'),
-      Text('Artist: ${media.artist}'),
-      Text('Album: ${media.album}'),
-      Text('Status: ${media.status}'),
-      Text('Player: ${media.playerName}'),
-      Text('Shuffle: ${controller.shuffleStatus.value}'),
-      Text('Loop: ${controller.loopStatus.value}'),
-    ],
-  );
-});
-```
-
-### Playback Controls (GetX)
-
-```dart
-// Play/Pause toggle
-ElevatedButton(
-  onPressed: () => controller.playPause(),
-  child: Text('Play/Pause'),
-);
-
-// Individual controls
-controller.play();
-controller.pause();
-controller.stop();
-controller.next();
-controller.previous();
-
-// Shuffle and loop
-controller.toggleShuffle();
-controller.cycleLoop(); // Cycles through None → Track → Playlist → None
-```
-
-### Volume Control (GetX)
-
-```dart
-Obx(() => Slider(
-  value: controller.volume.value.toDouble(),
-  min: 0,
-  max: 100,
-  onChanged: (value) => controller.setVolume(value.toInt()),
-));
-```
-
-### Seek/Position Control
-
-```dart
-// Get current position in microseconds
-final position = await manager.getPosition(); // Returns int? (microseconds)
-
-// Seek to absolute position (30 seconds = 30,000,000 microseconds)
-await manager.seekTo(30000000);
-
-// Seek relative to current position (forward 10 seconds)
-await manager.seek(10000000);
-
-// Seek backward (negative offset)
-await manager.seek(-10000000);
-
-// Convenience methods for seconds-based seeking
-await manager.seekForward(10); // Skip forward 10 seconds
-await manager.seekBackward(5);  // Skip backward 5 seconds
-
-// All seek methods support optional player parameter
+// target a specific player
 await manager.seekForward(10, 'spotify');
 ```
 
-**Note**: Position values are in microseconds (MPRIS standard). To convert:
+### Album art
 
-- Seconds → Microseconds: `seconds * 1,000,000`
-- Microseconds → Seconds: `microseconds / 1,000,000`
-
-### Album Art Server
-
-The plugin automatically starts a local HTTP server (on port `8765`) to serve album artwork from local files. This allows you to access album art from other devices on your network.
-
-**Features:**
-
-- Automatically converts `file://` URLs to local HTTP URLs
-- Online URLs (https://) from services like Spotify remain unchanged
-- Server runs on `0.0.0.0:8765` for network accessibility
-- CORS enabled for cross-origin requests
-
-**Cross-Device Access:**
-
-Album art URLs use `0.0.0.0` which you can replace with your machine's IP address:
+The plugin runs a small HTTP server on port `8765` to serve local album art files. Online URLs (Spotify, etc.) pass through unchanged.
 
 ```dart
-// Original URL from plugin
-final artUrl = 'http://0.0.0.0:8765/art/abc123.jpg';
+final artUrl = state.currentMedia.artUrl;
+// artUrl looks like: http://0.0.0.0:8765/art/abc123.jpg
 
-// Replace with your machine's IP for access from other devices
+// swap 0.0.0.0 with your machine's IP to access from other devices
 final networkUrl = artUrl.replaceAll('0.0.0.0', '192.168.1.100');
-// Now accessible as: http://192.168.1.100:8765/art/abc123.jpg
 ```
 
-**Example Usage:**
+The server starts when metadata is first fetched and stops when the manager is disposed. Health check at `http://0.0.0.0:8765/`.
+
+### Error handling
 
 ```dart
-// Get album art URL from metadata
-final artUrl = state.currentMedia.artUrl;
+final installed = await service.isPlayerctlInstalled();
+if (!installed) {
+  // playerctl not found on PATH
+  return;
+}
 
-// Display in Image widget
-if (artUrl.isNotEmpty) {
-  Image.network(
-    artUrl.replaceAll('0.0.0.0', 'YOUR_MACHINE_IP'),
-    errorBuilder: (context, error, stackTrace) {
-      return Icon(Icons.album); // Fallback icon
-    },
-  );
+final players = await service.getAvailablePlayers();
+if (players.isEmpty) {
+  // no MPRIS players running
+  return;
 }
 ```
 
-**Server Management:**
+## Multi-player support
 
-- Server starts automatically when metadata is first fetched
-- Server stops automatically when the manager is disposed
-- Health check available at `http://0.0.0.0:8765/`
-
-### Player Selection (GetX)
+The plugin detects all active MPRIS players and lets you switch between them at runtime. If the active player closes, it switches automatically.
 
 ```dart
-Obx(() {
-  if (controller.availablePlayers.length > 1) {
-    return DropdownButton<String>(
-      value: controller.selectedPlayer.value,
-      items: controller.availablePlayers.map((player) {
-        return DropdownMenuItem(
-          value: player,
-          child: Text(player),
-        );
-      }).toList(),
-      onChanged: (player) {
-        if (player != null) controller.switchPlayer(player);
-      },
-    );
-  }
-  return Container();
-});
-```
-
-### Error Handling
-
-```dart
-Obx(() {
-  // Check if playerctl is installed
-  if (!controller.isPlayerctlInstalled.value) {
-    return Text('Please install playerctl');
-  }
-  
-  // Check for active players
-  if (!controller.hasActivePlayer.value) {
-    return Text('No active media players');
-  }
-  
-  // Show any error messages
-  if (controller.errorMessage.value.isNotEmpty) {
-    return Text('Error: ${controller.errorMessage.value}');
-  }
-  
-  return YourMediaWidget();
-});
+final players = await manager.getAvailablePlayers();
+await manager.switchPlayer('vlc');
 ```
 
 ## Architecture
 
-This plugin follows SOLID principles with a clean, layered architecture:
+Three layers:
 
-### Core Layer (State-Agnostic)
+**Core** — `MediaPlayerManager` coordinates everything: player lifecycle, reconnection, stream merging, and debounced switching. `PlayerState` is an immutable snapshot of everything the plugin knows at a given moment.
 
-- **MediaPlayerManager**: Main coordinator class
-  - State-management-agnostic API
-  - Manages player lifecycle
-  - Handles automatic reconnection
-  - Triple-layer synchronization (stream + metadata refresh + volume sync)
-  - Debounced player switching
-  
-- **PlayerState**: Immutable state container
-  - All player information in one place
-  - Includes shuffle/loop status
-  - Easy to serialize/persist
+**Services** — each service owns one concern:
 
-### Service Layer
+- `MetadataProvider` — streams metadata; auto-restarts up to 5 times on crash
+- `PlayerDetector` — lists and monitors available MPRIS players
+- `PlaybackController` — sends play/pause/next/previous/shuffle/loop commands
+- `VolumeController` — gets and sets volume; syncs periodically to catch external changes
+- `CommandExecutor` — low-level process runner
 
-- **PlayerctlService**: Main facade service
-  - Combines all specialized services
-  - Provides unified API
+**Models** — `MediaInfo` holds the current track's title, artist, album, status, player name, position, and length.
 
-- **MetadataProvider**: Real-time metadata streaming
-  - Automatic process restart on failure
-  - Special character handling (triple-pipe delimiter)
-  - Up to 5 restart attempts
-
-- **PlayerDetector**: Player discovery and management
-  - Lists available MPRIS players
-  - Monitors player availability
-
-- **PlaybackController**: Playback command execution
-  - Play/pause/stop/next/previous
-  - Shuffle toggle and status
-  - Loop cycling (None/Track/Playlist)
-
-- **VolumeController**: Volume management
-  - Get/set volume (0-100)
-  - Periodic sync to detect external changes
-
-- **CommandExecutor**: Low-level command execution
-  - Process management
-  - Error handling
-
-### State Management Wrappers
-
-- **MediaController**: Optional GetX wrapper
-  - Reactive observables
-  - Automatic lifecycle management
-  - Easy integration with GetX apps
-
-### Models
-
-- **MediaInfo**: Metadata container
-  - Title, artist, album, status, player name
-  - Track position and length
-
-## Logging Configuration
-
-The playerctl package includes a comprehensive logging system with configurable log levels.
-
-### Setting Log Level
-
-There are **4 ways** to configure logging:
-
-**Method 1: Global Configuration** (Before creating managers)
-```dart
-import 'package:playerctl/playerctl.dart';
-
-void main() {
-  PlayerctlLogger.level = LogLevel.info; // Options: none, error, warning, info, debug
-  // Or: PlayerctlLogger.disableAll();  // Silent
-  // Or: PlayerctlLogger.enableAll();   // Verbose
-  runApp(MyApp());
-}
-```
-
-**Method 2: Constructor Configuration**
-```dart
-final manager = MediaPlayerManager(
-  logLevel: LogLevel.info, // Set initial log level
-);
-```
-
-**Method 3: Runtime Configuration**
-```dart
-// Change log level anytime
-manager.setLogLevel(LogLevel.error);
-
-// Check current level
-LogLevel current = manager.logLevel;
-```
-
-**Method 4: Direct Logger Access**
-```dart
-PlayerctlLogger.level = LogLevel.warning;
-```
-
-### Log Levels
-
-- **LogLevel.none** - No logging (production)
-- **LogLevel.error** - Only errors
-- **LogLevel.warning** - Warnings and errors
-- **LogLevel.info** - Info, warnings, and errors (recommended)
-- **LogLevel.debug** - All logs including verbose output
-
-**Default Behavior:**
-
-- Debug mode: `LogLevel.debug` (all logs shown)
-- Release mode: `LogLevel.error` (only errors shown)
-
-### Log Categories
-
-Logs are categorized with emoji indicators for easy identification:
-
-- 🔍 **DEBUG** - Verbose debugging information
-- ℹ️ **INFO** - General information
-- ⚠️ **WARNING** - Warning messages
-- ❌ **ERROR** - Error messages
-- ✅ **SUCCESS** - Success confirmations
-- 🎵 **METADATA** - Metadata updates
-- 📋 **PLAYER** - Player events
-- 🔊 **VOLUME** - Volume changes
-- 🔄 **SYNC** - Synchronization events
-
-See [LOGGING.md](LOGGING.md) for detailed documentation and examples.
-
-## Advanced Usage
-
-### Direct Service Access
-
-If you need lower-level access without GetX:
+## Direct service access
 
 ```dart
 final service = PlayerctlService();
 
-// Check installation
 bool installed = await service.isPlayerctlInstalled();
-
-// Get players
 List<String> players = await service.getAvailablePlayers();
 
-// Listen to metadata
 service.listenToMetadata().listen((metadata) {
-  print('Title: ${metadata['title']}');
-  print('Artist: ${metadata['artist']}');
+  print('${metadata['title']} — ${metadata['artist']}');
 });
 
-// Send commands
-await service.play();
-await service.next();
-await service.setVolume(75);
+// target a specific player
+service.listenToMetadata('spotify');
+await service.play('vlc');
+await service.next('spotify');
 
-// Cleanup
+await service.setVolume(75);
 service.dispose();
 ```
 
-### Targeting Specific Players
+## Logging
+
+Log level can be set globally, per-instance, or at runtime.
 
 ```dart
-// Listen to specific player
-service.listenToMetadata('spotify');
+// before startup
+PlayerctlLogger.level = LogLevel.info;
 
-// Send command to specific player
-await service.play('vlc');
-await service.next('spotify');
+// or in the constructor
+final manager = MediaPlayerManager(logLevel: LogLevel.info);
+
+// or while running
+manager.setLogLevel(LogLevel.error);
 ```
 
-## Example App
+Available levels: `none`, `error`, `warning`, `info`, `debug`.
 
-A complete example app is included in the `example/` directory. To run it:
+Defaults: `debug` in debug mode, `error` in release mode.
+
+## Example app
 
 ```bash
 cd example
 flutter run -d linux
 ```
 
-The example demonstrates:
-
-- Installation checking
-- Player detection and switching
-- All playback controls (play/pause/next/previous)
-- Volume control with external sync
-- Shuffle and loop controls
-- Multi-player management
-- Error handling
-- Real-time metadata updates
-- Automatic player switching
-
 ## Troubleshooting
 
-### "playerctl is not installed"
+**"playerctl is not installed"** — install it via your distro's package manager (see Requirements).
 
-Install playerctl using your distribution's package manager (see Requirements section).
+**"No active media players found"** — open a player that supports MPRIS (Spotify, VLC, Firefox, etc.) and start playing something.
 
-### "No active media players found"
+**Commands not working** — not all players implement the full MPRIS spec. Check what the player supports.
 
-Start a media player that supports MPRIS (like Spotify, VLC, Firefox, Chromium, etc.) and play some media.
+**Stream stopped updating** — there's a periodic fallback that refreshes every 3 seconds even if the real-time stream stalls.
 
-### Commands not working
+**Glitching on player switch** — switching is debounced. If it's still rough, enable debug logging to check the timer lifecycle.
 
-Some players may not support all MPRIS commands. Check the player's MPRIS implementation.
+## Supported players
 
-### Stream not updating
-
-The plugin has triple-layer synchronization. If real-time updates stop, periodic refresh (every 3 seconds) will continue to update state.
-
-### Glitching when switching players
-
-The plugin includes debouncing to prevent rapid consecutive switches. If issues persist, check debug output for timer lifecycle messages.
-
-## Supported Players
-
-Any MPRIS-compatible media player, including:
-
-- Spotify
-- VLC
-- Firefox
-- Chromium/Chrome
-- MPV
-- Audacious
-- Rhythmbox
-- And many more...
+Anything MPRIS-compatible: Spotify, VLC, Firefox, Chromium, MPV, Audacious, Rhythmbox, and more.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+MIT
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+PRs welcome.
 
 ## Credits
 
-Built with:
-
-- [playerctl](https://github.com/altdesktop/playerctl) - Command-line MPRIS client
-- [GetX](https://pub.dev/packages/get) - State management
-- Flutter - UI framework
+- [playerctl](https://github.com/altdesktop/playerctl) — the CLI this plugin wraps
+- Flutter

@@ -1,8 +1,15 @@
 name: playerctl
 description: "A Flutter plugin for Linux that provides robust media playback control using playerctl CLI with multi-player support and automatic error recovery."
-version: 1.2.0
+version: 1.2.1
 homepage: https://chinmaysinghmodak.com/
 repository: https://github.com/Chinmay575/playerctl
+
+topics:
+  - linux
+  - media
+  - playerctl
+  - mpris
+  - audio
 
 platforms:
   linux:

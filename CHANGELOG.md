@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.2.1
+
+* Rewrote README for clarity — shorter, more direct, less boilerplate
+* Added pub.dev topics to pubspec (`linux`, `media`, `playerctl`, `mpris`, `audio`)
+
 ## 1.2.0
 
 * **Major Features**:
